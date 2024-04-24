@@ -9,8 +9,8 @@ def load_lipo() -> tuple[LipoParams, ...]:
         row_content = i[1]
         result.append(
             LipoParams(
-                name=row_content[0],
-                logP=row_content[1],
+                name=row_content.iloc[0],
+                logP=row_content.iloc[1],
                 parameters=pd.Series.tolist(row_content[2:]),
             )
         )
