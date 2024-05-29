@@ -8,7 +8,7 @@ def relu(x):
 
 
 def h(x):
-    return 1. * (x > 0)
+    return 1.0 * (x > 0)
 
 
 class TwoLayerPerceptron:
@@ -28,7 +28,7 @@ class TwoLayerPerceptron:
         ndf = (df - self.min_values) / (self.max_values - self.min_values)
         self.y = ndf["logP"].values.reshape(-1, 1)
         self.x = ndf.iloc[:, 1:].values
-        self.W1 = np.random.randn(len(self.x[0]), self.hidden_size)
+        self.W1 = np.random.randn(self.hidden_size, len(self.x[0]))
         self.b1 = np.zeros((1, self.hidden_size))
         self.W2 = np.random.randn(self.hidden_size, 1)
         self.b2 = np.zeros((1, 1))
@@ -68,30 +68,41 @@ class TwoLayerPerceptron:
     def train(self):
         flag = True
         while flag:
-            L = [self.y[i] - self.forward(self.x[i]) for i in range(len(self.y))]
+            z1 = [np.dot(self.W1,i) + self.b1 for i in self.x]
+            a1 = [relu(i) for i in z1]
+            z2 = [np.dot(i, self.W2) + self.b2 for i in a1]
+            L = [(self.y[i] - z2[i])[0] for i in range(len(self.x))]
             V = [
-                np.outer(self.W2, h(np.dot(self.x[i],self.W1) + self.b1))
+                np.outer(self.W2, h(np.dot(self.W1,self.x[i]) + self.b1))[0]
                 for i in range(len(self.x))
             ]
             db2j = np.sum(L)
             dw2j = np.sum(
                 [
-                    relu(np.dot(self.x[i],self.W1) + self.b1) * L[i]
+                    np.outer(
+                        np.dot(L[i], relu(np.dot(self.W1,self.x[i]) + self.b1)), 1
+                    )
                     for i in range(len(self.x))
-                ]
+                ],
+                axis=0,
             )
-            db1j = np.sum([V[i] * L[i] for i in range(len(self.x))])
-            dw1j = np.sum([np.outer(V[i] * L[i], self.x[i]) for i in range(len(self.x))], axis=0)
+            db1j = np.sum(
+                [np.outer(V[i] * L[i], 1) for i in range(len(self.x))], axis=0
+            )
+            dw1j = np.sum(
+                [np.outer(V[i] * L[i], self.x[i]) for i in range(len(self.x))], axis=0
+            )
             dj = [db2j, dw2j, db1j, dw1j]
             for i in dj:
-                if i < self.sigma:
-                    return
-            self.b2, self.W2, self.b1, self.W1 = (
-                self.b2,
-                self.W2,
-                self.b1,
-                self.W1,
-            ) + self.eps * dj
+                try:
+                    if np.linalg.norm(i) < self.sigma:
+                        return
+                except ValueError:
+                    pass
+            self.b2 += db2j * self.eps
+            np.add(self.W2, dw2j * self.eps)
+            np.add(self.b1, db1j * self.eps)
+            np.add(self.W1, dw1j * self.eps)
 
     def predict(self, X):
         # Make predictions
@@ -99,5 +110,7 @@ class TwoLayerPerceptron:
 
 
 if __name__ == "__main__":
-    model = TwoLayerPerceptron(hidden_size=4, eps=0.1, sigma=0.1)
+    model = TwoLayerPerceptron(hidden_size=32, eps=0.1, sigma=0.1)
     model.train()
+    for i in range(len(model.x)):
+        print(f"{model.predict(model.x[i]).flatten()}\t{model.y[i]}")
